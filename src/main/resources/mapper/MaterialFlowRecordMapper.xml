@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zjrealtech.tracedemo.mapper.MaterialFlowRecordMapper">
+    <resultMap id="BaseResultMap" type="com.zjrealtech.tracedemo.domain.model.MaterialFlowRecordModel">
+        <id column="_id" property="id" jdbcType="INTEGER"/>
+        <result column="src_snapshot_id" property="srcSnapshotId" jdbcType="VARCHAR"/>
+        <result column="src_deduction_num" property="srcDeductionNum" jdbcType="NUMERIC"/>
+        <result column="op_type" property="opType" jdbcType="INTEGER"/>
+        <result column="op_type_name" property="opTypeName" jdbcType="VARCHAR"/>
+        <result column="stock_type" property="stockType" jdbcType="INTEGER"/>
+        <result column="stock_type_name" property="stockTypeName" jdbcType="VARCHAR"/>
+        <result column="material_status" property="materialStatus" jdbcType="INTEGER"/>
+        <result column="material_status_name" property="materialStatusName" jdbcType="VARCHAR"/>
+        <result column="op_id" property="opId" jdbcType="VARCHAR"/>
+        <result column="op_batch_id" property="opBatchId" jdbcType="VARCHAR"/>
+        <result column="op_time" property="opTime" jdbcType="TIMESTAMP"/>
+        <result column="dest_snapshot_id" property="destSnapshotId" jdbcType="VARCHAR"/>
+        <result column="material_code" property="materialCode" jdbcType="VARCHAR"/>
+        <result column="material_name" property="materialName" jdbcType="VARCHAR"/>
+        <result column="material_unit" property="materialUnit" jdbcType="VARCHAR"/>
+        <result column="batch_no" property="batchNo" jdbcType="VARCHAR"/>
+        <result column="quantity" property="quantity" jdbcType="NUMERIC"/>
+        <result column="person_code" property="personCode" jdbcType="VARCHAR"/>
+        <result column="person_name" property="personName" jdbcType="VARCHAR"/>
+        <result column="equipment_id" property="equipmentId" jdbcType="INTEGER"/>
+        <result column="equipment_code" property="equipmentCode" jdbcType="VARCHAR"/>
+        <result column="equipment_name" property="equipmentName" jdbcType="VARCHAR"/>
+        <result column="mold_code" property="moldCode" jdbcType="VARCHAR"/>
+        <result column="do_code" property="doCode" jdbcType="VARCHAR"/>
+        <result column="process_code" property="processCode" jdbcType="VARCHAR"/>
+        <result column="process_name" property="processName" jdbcType="VARCHAR"/>
+        <result column="process_seq" property="processSeq" jdbcType="VARCHAR"/>
+        <result column="shift_name" property="shiftName" jdbcType="VARCHAR"/>
+        <result column="shift_start_time" property="shiftStartTime" jdbcType="TIMESTAMP"/>
+        <result column="shift_end_time" property="shiftEndTime" jdbcType="TIMESTAMP"/>
+        <result column="parent_do_id" property="parentDoId" jdbcType="INTEGER"/>
+        <result column="parent_process_code" property="parentProcessCode" jdbcType="VARCHAR"/>
+        <result column="parent_process_name" property="parentProcessName" jdbcType="VARCHAR"/>
+        <result column="src_warehouse" property="srcWarehouse" jdbcType="VARCHAR"/>
+        <result column="src_warehouse_location" property="srcWarehouseLocation" jdbcType="VARCHAR"/>
+        <result column="warehouse" property="warehouse" jdbcType="VARCHAR"/>
+        <result column="warehouse_location" property="warehouseLocation" jdbcType="VARCHAR"/>
+        <result column="src_barcode" property="srcBarcode" jdbcType="VARCHAR"/>
+        <result column="barcode" property="barcode" jdbcType="VARCHAR"/>
+        <result column="quality_type" property="qualityType" jdbcType="INTEGER"/>
+        <result column="contact_no" property="contactNo" jdbcType="VARCHAR"/>
+        <result column="contact_name" property="contactName" jdbcType="VARCHAR"/>
+        <result column="src_deduction_batch_id" property="srcDeductionBatchId" jdbcType="INTEGER"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+    b._id, b.src_snapshot_id, b.src_deduction_num, b.op_type, b.op_type_name, b.stock_type, b.stock_type_name, b.material_status, b.material_status_name, b.op_id, b.op_batch_id, b.op_time,
+    b.dest_snapshot_id, b.material_code, b.material_name, b.material_unit, b.batch_no, b.quantity, b.person_code, b.person_name, b.equipment_id, b.equipment_code,
+    b.equipment_name, b.mold_code, b.do_code, b.process_code, b.process_name, b.process_seq, b.shift_name, b.shift_start_time, b.shift_end_time,
+    b.parent_do_id, b.parent_process_code, b.parent_process_name, b.src_warehouse, b.src_warehouse_location, b.warehouse, b.warehouse_location,
+    b.src_barcode, b.barcode, b.quality_type, b.contact_no, b.contact_name, b.src_deduction_batch_id
+  </sql>
+
+    <select id="selectNextRecordsByDestSnapshotId" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from fact_material_flow_record a inner join fact_material_flow_record b on a.dest_snapshot_id = b.src_snapshot_id where exists (select 1 from dbo.Split(
+            <if test="snapshotIdList != null and snapshotIdList.size() > 0">
+                <foreach collection="snapshotIdList" item="snapshotId" index="index" open="'" close="'"
+                         separator=",">
+                    ${snapshotId}
+                </foreach>
+                , ',') t where t.content = a.dest_snapshot_id)
+            </if>
+    </select>
+
+</mapper>

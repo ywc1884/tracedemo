@@ -1,0 +1,21 @@
+
+<!--suppress XmlUnboundNsPrefix, XmlUnboundNsPrefix -->
+<configuration debug="false" scan="true" scanPeriod="30 seconds" >
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date %highlight(%5level) [%thread] %cyan([%file:%line]) %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- show sql -->
+    <!--向上传递-->
+    <logger name="com.zjrealtech.tracedemo.mapper" level="DEBUG"  additivity="true">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
