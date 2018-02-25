@@ -60,13 +60,15 @@
         select
         <include refid="Base_Column_List"/>
         from fact_material_flow_record a inner join fact_material_flow_record b on a.dest_snapshot_id = b.src_snapshot_id where exists (select 1 from dbo.Split(
-            <if test="snapshotIdList != null and snapshotIdList.size() > 0">
-                <foreach collection="snapshotIdList" item="snapshotId" index="index" open="'" close="'"
-                         separator=",">
-                    ${snapshotId}
-                </foreach>
-                , ',') t where t.content = a.dest_snapshot_id)
+            <if test="snapshotIdList != null">
+                ${snapshotIdList}, ',') t where t.content = a.dest_snapshot_id)
             </if>
+    </select>
+
+    <select id="selectRecordsByDestSnapshotId" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from fact_material_flow_record b where b.dest_snapshot_id = #{snapshotId}
     </select>
 
 </mapper>

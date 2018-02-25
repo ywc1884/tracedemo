@@ -6,5 +6,7 @@ import java.util.List;
 
 public interface MaterialFlowRecordDao {
 
-    List<MaterialFlowRecordModel> getFlowRecordsByDestSnapshotId(List<String> snapshotIdList);
+    List<MaterialFlowRecordModel> getNextFlowRecordsByDestSnapshotId(List<String> snapshotIdList);
+
+    List<MaterialFlowRecordModel> getFlowRecordsByDestSnapshotId(String snapshotId);
 }
