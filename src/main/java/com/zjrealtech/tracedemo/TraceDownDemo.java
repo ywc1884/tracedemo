@@ -9,13 +9,11 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
-import java.sql.ResultSet;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+@SuppressWarnings("SpringJavaAutowiredFieldsWarningInspection")
 @Component
 @Slf4j
 public class TraceDownDemo {
@@ -27,6 +25,7 @@ public class TraceDownDemo {
     private int splitCount;
 
     private List<MaterialFlowRecordModel> finalRecordsList = new ArrayList<>();
+    private Map<String, MaterialFlowRecordModel> finalRecordsMap = new HashMap<>();
 
     public void sqlTest() {
         String snapshotId = "D38542D9-050E-4B1A-9D7B-E8D14B599410";
@@ -38,13 +37,18 @@ public class TraceDownDemo {
         try {
             long start = System.currentTimeMillis();
             String startPointDestSnapshotId = "D38542D9-050E-4B1A-9D7B-E8D14B599410";
+            //get start point flow records
             List<MaterialFlowRecordModel> startPointsRecords = materialFlowRecordDao.getFlowRecordsByDestSnapshotId(startPointDestSnapshotId);
+            //add the start point flow records into final record list
+            //finalRecordsList.addAll(startPointsRecords);
+            startPointsRecords.forEach(record -> finalRecordsMap.put(getSnapshotKey(record.getSrcSnapshotId(), record.getDestSnapshotId()), record));
+            //recursively trace down to get all flow records
             traceDownRecords(startPointsRecords, 0);
             long millis = System.currentTimeMillis() - start;
             System.out.println(String.format("it totally took %s to trace down", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
                     TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)))));
 
-            log.info("the final record count: " + finalRecordsList.size());
+            log.info("the final record count: " + finalRecordsMap.size());
         } catch (Exception e) {
             log.error("exception in traceDownTest", e);
         }
@@ -55,42 +59,61 @@ public class TraceDownDemo {
             for (int i = 0, j = splitCount; i < currentFlowRecords.size(); i += splitCount, j += splitCount) {
                 j = j > currentFlowRecords.size() ? currentFlowRecords.size() : j;
                 List<MaterialFlowRecordModel> subList = new ArrayList<>(currentFlowRecords.subList(i, j));
-                if (!subList.isEmpty()) {
+                if (!CollectionUtils.isEmpty(subList)) {
                     traceDownRecords(subList, level + 1);
                 }
             }
         } else {
-            List<MaterialFlowRecordModel> nextFlowRecords = new ArrayList<>();
+            List<MaterialFlowRecordModel> filteredNextFlowRecords = new ArrayList<>();
             try {
                 List<String> snapshotIdList = new ArrayList<>();
-                currentFlowRecords.forEach(record -> snapshotIdList.add(record.getDestSnapshotId()));
-                nextFlowRecords = materialFlowRecordDao.getNextFlowRecordsByDestSnapshotId(snapshotIdList);
+                for (MaterialFlowRecordModel record : currentFlowRecords) {
+                    snapshotIdList.add(record.getDestSnapshotId());
+                }
+                snapshotIdList = removeDuplicateSnapshotIds(snapshotIdList);
+                List<MaterialFlowRecordModel> nextFlowRecords = materialFlowRecordDao.getNextFlowRecordsByDestSnapshotId(snapshotIdList);
 
                 if (!CollectionUtils.isEmpty(nextFlowRecords)) {
-
-                    List<MaterialFlowRecordModel> nextFilterRecords = new ArrayList<>();
-
                     nextFlowRecords.forEach(nextRecord -> {
-                        if (finalRecordsList.stream().anyMatch(record -> record.getDestSnapshotId().equalsIgnoreCase(nextRecord.getDestSnapshotId()))) {
-                            nextFilterRecords.add(nextRecord);
+                        String destSnapshotId = nextRecord.getDestSnapshotId();
+                        String srcSnapshotId = nextRecord.getSrcSnapshotId();
+                        String snapshotKey = getSnapshotKey(srcSnapshotId, destSnapshotId);
+                        if (!finalRecordsMap.containsKey(snapshotKey)) {
+                            filteredNextFlowRecords.add(nextRecord);
+                            finalRecordsMap.put(snapshotKey, nextRecord);
                         }
                     });
-
-                    if (!CollectionUtils.isEmpty(nextFilterRecords)) {
-                        nextFlowRecords.removeAll(nextFilterRecords);
-                    }
-
-                    finalRecordsList.addAll(nextFlowRecords);
                 }
-
             } catch (Exception e) {
                 log.error("exception in traceDownRecords", e);
             }
 
-            if (!CollectionUtils.isEmpty(nextFlowRecords)) {
-                traceDownRecords(nextFlowRecords, level + 1);
+            if (!CollectionUtils.isEmpty(filteredNextFlowRecords)) {
+                traceDownRecords(filteredNextFlowRecords, level + 1);
             }
         }
+    }
+
+    private List<MaterialFlowRecordModel> removeDuplicateFlowRecords(List<MaterialFlowRecordModel> originalRecords) {
+        Map<String, MaterialFlowRecordModel> map = new HashMap<>();
+        List<MaterialFlowRecordModel> filteredRecords = null;
+
+        try {
+            originalRecords.forEach(record -> {
+                String destSnapshotId = record.getDestSnapshotId();
+                if (!map.containsKey(destSnapshotId)) {
+                    map.put(destSnapshotId, record);
+                }
+            });
+
+            if (!map.isEmpty()) {
+                filteredRecords = new ArrayList<>(map.values());
+            }
+        } catch (Exception e) {
+            log.error("exception in removeDuplicateFlowRecords", e);
+        }
+
+        return filteredRecords;
     }
 
     @Async
@@ -109,9 +132,11 @@ public class TraceDownDemo {
         List<MaterialFlowRecordModel> nextFlowRecords = new ArrayList<>();
         try {
             List<String> snapshotIdList = new ArrayList<>();
-            currentFlowRecords.forEach(record -> snapshotIdList.add(record.getDestSnapshotId()));
-            long start = System.currentTimeMillis();
-            if (snapshotIdList.size() > splitCount){
+            for (MaterialFlowRecordModel record : currentFlowRecords) {
+                snapshotIdList.add(record.getDestSnapshotId());
+            }
+            snapshotIdList = removeDuplicateSnapshotIds(snapshotIdList);
+            if (snapshotIdList.size() > splitCount) {
                 List<CompletableFuture<List<MaterialFlowRecordModel>>> futures = new ArrayList<>();
                 //if record size larger than split count, split the query into multiple query
                 for (int i = 0, j = splitCount; i < currentFlowRecords.size(); i += splitCount, j += splitCount) {
@@ -124,30 +149,18 @@ public class TraceDownDemo {
                 }
 
                 //wait for all threads to complete
-                CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()])).join();
+                CompletableFuture[] futureArrays = futures.toArray(new CompletableFuture[futures.size()]);
+                CompletableFuture.allOf(futureArrays).join();
 
-            }
-            nextFlowRecords = materialFlowRecordDao.getNextFlowRecordsByDestSnapshotId(snapshotIdList);
-            long millis = System.currentTimeMillis() - start;
-            System.out.println(String.format("it took %s to execute the query", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
-                    TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)))));
-
-            if (!CollectionUtils.isEmpty(nextFlowRecords)) {
-
-                List<MaterialFlowRecordModel> nextFilterRecords = new ArrayList<>();
-
-                nextFlowRecords.forEach(nextRecord -> {
-                    if (finalRecordsList.stream().anyMatch(record -> record.getDestSnapshotId().equalsIgnoreCase(nextRecord.getDestSnapshotId()))) {
-                        nextFilterRecords.add(nextRecord);
-                    }
-                });
-
-                if (!CollectionUtils.isEmpty(nextFilterRecords)) {
-                    nextFlowRecords.removeAll(nextFilterRecords);
+                //merge all results into a single list
+                for (CompletableFuture<List<MaterialFlowRecordModel>> future : futures) {
+                    nextFlowRecords.addAll(future.get());
                 }
-
-                finalRecordsList.addAll(nextFlowRecords);
+            } else {
+                nextFlowRecords = materialFlowRecordDao.getNextFlowRecordsByDestSnapshotId(snapshotIdList);
             }
+
+            finalRecordsList.addAll(nextFlowRecords);
 
         } catch (Exception e) {
             log.error("exception in traceDownRecords", e);
@@ -156,5 +169,21 @@ public class TraceDownDemo {
         if (!CollectionUtils.isEmpty(nextFlowRecords)) {
             traceDownRecords(nextFlowRecords, level + 1);
         }
+    }
+
+    private List<String> removeDuplicateSnapshotIds(List<String> snapshotIdList) {
+        List<String> snapshotIds = new ArrayList<>();
+        try {
+            Set<String> hs = new HashSet<>(snapshotIdList);
+            snapshotIds.addAll(hs);
+        } catch (Exception e) {
+            log.error("exception in removeDuplicateSnapshotIds", e);
+        }
+
+        return snapshotIds;
+    }
+
+    private String getSnapshotKey(String srcId, String destId){
+        return srcId + "@" + destId;
     }
 }
