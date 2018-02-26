@@ -64,11 +64,7 @@ public class TraceDownDemo {
             try {
                 List<String> snapshotIdList = new ArrayList<>();
                 currentFlowRecords.forEach(record -> snapshotIdList.add(record.getDestSnapshotId()));
-                long start = System.currentTimeMillis();
                 nextFlowRecords = materialFlowRecordDao.getNextFlowRecordsByDestSnapshotId(snapshotIdList);
-                long millis = System.currentTimeMillis() - start;
-                System.out.println(String.format("it took %s to execute the query", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
-                        TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)))));
 
                 if (!CollectionUtils.isEmpty(nextFlowRecords)) {
 
