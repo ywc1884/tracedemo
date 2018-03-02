@@ -1,20 +1,19 @@
 <!--suppress XmlUnboundNsPrefix, XmlUnboundNsPrefix -->
 <configuration debug="false" scan="true" scanPeriod="30 seconds">
 
+    <timestamp key="bySecond" datePattern="yyyyMMddkkmmss"/>
+
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%date %highlight(%5level) [%thread] %cyan([%file:%line]) %msg%n</pattern>
         </encoder>
     </appender>
 
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>tracedemo.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>tracedemo.%d.zip</fileNamePattern>
-            <maxHistory>5</maxHistory>
-        </rollingPolicy>
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>tracedemo-${bySecond}.log</file>
+        <append>true</append>
         <encoder>
-            <pattern>[%date] [%level] %msg [%logger{100}] [%thread] %n</pattern>
+            <Pattern>%d{HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</Pattern>
         </encoder>
     </appender>
 

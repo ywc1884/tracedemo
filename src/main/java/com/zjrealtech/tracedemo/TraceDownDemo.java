@@ -2,6 +2,7 @@ package com.zjrealtech.tracedemo;
 
 import com.zjrealtech.tracedemo.dao.MaterialFlowRecordDao;
 import com.zjrealtech.tracedemo.domain.model.MaterialFlowRecordModel;
+import com.zjrealtech.tracedemo.domain.model.StartPointTraceInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +27,7 @@ public class TraceDownDemo {
 
     private List<MaterialFlowRecordModel> finalRecordsList = new ArrayList<>();
     private Map<String, MaterialFlowRecordModel> finalRecordsMap = new HashMap<>();
+    private Map<String, Boolean> startPointsToBeDel = new HashMap<>();
 
     public void sqlTest() {
         String snapshotId = "D38542D9-050E-4B1A-9D7B-E8D14B599410";
@@ -44,11 +46,29 @@ public class TraceDownDemo {
             startPointsRecords.forEach(record -> finalRecordsMap.put(getSnapshotKey(record.getSrcSnapshotId(), record.getDestSnapshotId()), record));
             //recursively trace down to get all flow records
             traceDownRecords(startPointsRecords, 0);
+
             long millis = System.currentTimeMillis() - start;
             System.out.println(String.format("it totally took %s to trace down", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
                     TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)))));
 
             log.info("the final record count: " + finalRecordsMap.size());
+
+            //draw graph
+            long drawStart = System.currentTimeMillis();
+            StartPointTraceInfo startPointTraceInfo = new StartPointTraceInfo();
+            startPointTraceInfo.setSnapshotId(startPointDestSnapshotId);
+            TraceGraphUtil.drawTraceDownGraph(Collections.singletonList(startPointTraceInfo), finalRecordsMap, startPointsToBeDel);
+            long drawTime = System.currentTimeMillis() - drawStart;
+            System.out.println(String.format("it totally took %s to draw graph", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(drawTime), TimeUnit.MILLISECONDS.toSeconds(drawTime) -
+                    TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(drawTime)))));
+
+            //list all time to draw action nodes
+            System.out.println(String.format("it totally took %s to find existing node", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findExistingNodeTime),
+                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.findExistingNodeTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findExistingNodeTime)))));
+            System.out.println(String.format("it totally took %s to find node to merge", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findNodeToMergeTime),
+                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.findNodeToMergeTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findNodeToMergeTime)))));
+            System.out.println(String.format("it totally took %s in action node recursion", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.actionNodeRecursionTime),
+                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.actionNodeRecursionTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.actionNodeRecursionTime)))));
         } catch (Exception e) {
             log.error("exception in traceDownTest", e);
         }
@@ -81,6 +101,9 @@ public class TraceDownDemo {
                         if (!finalRecordsMap.containsKey(snapshotKey)) {
                             filteredNextFlowRecords.add(nextRecord);
                             finalRecordsMap.put(snapshotKey, nextRecord);
+                        } else {
+                            //keep a record of duplicate records with duplicate dest snapshot id, used to filter start points
+                            startPointsToBeDel.put(destSnapshotId, true);
                         }
                     });
                 }
