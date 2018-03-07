@@ -13,6 +13,7 @@ import org.springframework.util.CollectionUtils;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("SpringJavaAutowiredFieldsWarningInspection")
 @Component
@@ -27,6 +28,8 @@ public class TraceDownDemo {
 
     private List<MaterialFlowRecordModel> finalRecordsList = new ArrayList<>();
     private Map<String, MaterialFlowRecordModel> finalRecordsMap = new HashMap<>();
+    private Map<Integer, List<MaterialFlowRecordModel>> levelRecordsMap = new HashMap<>();
+    public static Map<String, List<MaterialFlowRecordModel>> traceDownRecordsMap = new HashMap<>();
     private Map<String, Boolean> startPointsToBeDel = new HashMap<>();
 
     public void sqlTest() {
@@ -47,11 +50,30 @@ public class TraceDownDemo {
             //recursively trace down to get all flow records
             traceDownRecords(startPointsRecords, 0);
 
+            log.info("the final record count: " + finalRecordsMap.size());
+
+            levelRecordsMap.forEach((level, records) -> {
+                System.out.println(String.format("level: %d, record count: %d", level, records.size()));
+
+                if (levelRecordsMap.containsKey(level + 1)){
+                    List<MaterialFlowRecordModel> nextLevelRecords = levelRecordsMap.get(level + 1);
+                    for(MaterialFlowRecordModel record : records){
+                        String snapshotId = record.getDestSnapshotId();
+                        List<MaterialFlowRecordModel> nextRecords = nextLevelRecords.stream()
+                                .filter(nextRecord -> nextRecord.getSrcSnapshotId().equalsIgnoreCase(snapshotId)).collect(Collectors.toList());
+                        traceDownRecordsMap.put(snapshotId, nextRecords);
+                    }
+                }
+            });
+            int totalRecordCount = levelRecordsMap.values().stream().map(List::size).reduce(0, (l1, l2) -> l1 + l2);
+            System.out.println("the total record count in level map is: " + totalRecordCount);
+
             long millis = System.currentTimeMillis() - start;
             System.out.println(String.format("it totally took %s to trace down", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
                     TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)))));
 
-            log.info("the final record count: " + finalRecordsMap.size());
+            int traceDownRecordsCount = traceDownRecordsMap.values().stream().map(List::size).reduce(0, (l1, l2) -> l1 + l2);
+            System.out.println("the total record count in trace down map is: " + traceDownRecordsCount);
 
             //draw graph
             long drawStart = System.currentTimeMillis();
@@ -80,11 +102,22 @@ public class TraceDownDemo {
                 j = j > currentFlowRecords.size() ? currentFlowRecords.size() : j;
                 List<MaterialFlowRecordModel> subList = new ArrayList<>(currentFlowRecords.subList(i, j));
                 if (!CollectionUtils.isEmpty(subList)) {
-                    traceDownRecords(subList, level + 1);
+                    traceDownRecords(subList, level);
                 }
             }
         } else {
             List<MaterialFlowRecordModel> filteredNextFlowRecords = new ArrayList<>();
+
+            List<MaterialFlowRecordModel> levelRecordsList;
+            if (!levelRecordsMap.containsKey(level)){
+                levelRecordsList = new ArrayList<>(currentFlowRecords);
+            } else {
+                levelRecordsList = levelRecordsMap.get(level);
+                levelRecordsList.addAll(currentFlowRecords);
+            }
+
+            levelRecordsMap.put(level, levelRecordsList);
+
             try {
                 List<String> snapshotIdList = new ArrayList<>();
                 for (MaterialFlowRecordModel record : currentFlowRecords) {
@@ -208,5 +241,11 @@ public class TraceDownDemo {
 
     private String getSnapshotKey(String srcId, String destId){
         return srcId + "@" + destId;
+    }
+
+    private String getsnapshotIdFromKey(String key){
+        int separatorIndex = key.indexOf("@");
+        String snapshotId = key.substring(separatorIndex + 1);
+        return snapshotId;
     }
 }
