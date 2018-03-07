@@ -52,22 +52,6 @@ public class TraceDownDemo {
 
             log.info("the final record count: " + finalRecordsMap.size());
 
-            levelRecordsMap.forEach((level, records) -> {
-                System.out.println(String.format("level: %d, record count: %d", level, records.size()));
-
-                if (levelRecordsMap.containsKey(level + 1)){
-                    List<MaterialFlowRecordModel> nextLevelRecords = levelRecordsMap.get(level + 1);
-                    for(MaterialFlowRecordModel record : records){
-                        String snapshotId = record.getDestSnapshotId();
-                        List<MaterialFlowRecordModel> nextRecords = nextLevelRecords.stream()
-                                .filter(nextRecord -> nextRecord.getSrcSnapshotId().equalsIgnoreCase(snapshotId)).collect(Collectors.toList());
-                        traceDownRecordsMap.put(snapshotId, nextRecords);
-                    }
-                }
-            });
-            int totalRecordCount = levelRecordsMap.values().stream().map(List::size).reduce(0, (l1, l2) -> l1 + l2);
-            System.out.println("the total record count in level map is: " + totalRecordCount);
-
             long millis = System.currentTimeMillis() - start;
             System.out.println(String.format("it totally took %s to trace down", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
                     TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)))));
@@ -108,16 +92,6 @@ public class TraceDownDemo {
         } else {
             List<MaterialFlowRecordModel> filteredNextFlowRecords = new ArrayList<>();
 
-            List<MaterialFlowRecordModel> levelRecordsList;
-            if (!levelRecordsMap.containsKey(level)){
-                levelRecordsList = new ArrayList<>(currentFlowRecords);
-            } else {
-                levelRecordsList = levelRecordsMap.get(level);
-                levelRecordsList.addAll(currentFlowRecords);
-            }
-
-            levelRecordsMap.put(level, levelRecordsList);
-
             try {
                 List<String> snapshotIdList = new ArrayList<>();
                 for (MaterialFlowRecordModel record : currentFlowRecords) {
@@ -145,6 +119,17 @@ public class TraceDownDemo {
             }
 
             if (!CollectionUtils.isEmpty(filteredNextFlowRecords)) {
+
+                String srcSnapshotId = filteredNextFlowRecords.get(0).getSrcSnapshotId();
+                List<MaterialFlowRecordModel> nextRecords;
+                if (!traceDownRecordsMap.containsKey(srcSnapshotId)){
+                    nextRecords = new ArrayList<>(filteredNextFlowRecords);
+                } else {
+                    nextRecords = traceDownRecordsMap.get(srcSnapshotId);
+                    nextRecords.addAll(filteredNextFlowRecords);
+                }
+                traceDownRecordsMap.put(srcSnapshotId, nextRecords);
+
                 traceDownRecords(filteredNextFlowRecords, level + 1);
             }
         }
