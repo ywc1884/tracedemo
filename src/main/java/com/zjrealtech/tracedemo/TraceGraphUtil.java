@@ -23,24 +23,24 @@ public class TraceGraphUtil {
     public static long findNodeToMergeTime;
     public static long actionNodeRecursionTime;
 
-    public static List<TraceGraphNodeDto> downGenerateActionNodesByStartPoints(List<StartPointTraceInfo> startPointTraceInfoList, Map<String, MaterialFlowRecordModel> traceResult) {
+    public static List<TraceGraphNodeDto> downGenerateActionNodesByStartPoints(List<StartPointTraceInfo> startPointTraceInfoList, Map<String, List<MaterialFlowRecordModel>> traceResult) {
         List<TraceGraphNodeDto> nodeDtoList = new ArrayList<>();
         if (traceResult != null) {
+            List<MaterialFlowRecordModel> startPointRecords = traceResult.get(TraceDownDemo.startPointsKey);
             for (StartPointTraceInfo startPointTraceInfo : startPointTraceInfoList) {
                 // 获取起点对应的流转记录
-                List<MaterialFlowRecordModel> startPointFlowRecords = traceResult.entrySet().stream()
-                        .filter(entry -> entry.getValue().getDestSnapshotId().equalsIgnoreCase(startPointTraceInfo.getSnapshotId()))
-                        .map(Map.Entry::getValue)
+                List<MaterialFlowRecordModel> startPointFlowRecords = startPointRecords.stream()
+                        .filter(record -> record.getDestSnapshotId().equalsIgnoreCase(startPointTraceInfo.getSnapshotId()))
                         .collect(Collectors.toList());
 
                 //从起点开始生成动作节点
-                downGenerateActionNodes(traceResult, nodeDtoList, startPointFlowRecords, TraceGraphNodeDto.ROOT_KEY);
+                downGenerateActionNodes(nodeDtoList, startPointFlowRecords, TraceGraphNodeDto.ROOT_KEY);
             }
         }
         return nodeDtoList;
     }
 
-    private static void downGenerateActionNodes(Map<String, MaterialFlowRecordModel> traceResult, List<TraceGraphNodeDto> nodeDtoList, List<MaterialFlowRecordModel> flowRecordList, String pointer) {
+    private static void downGenerateActionNodes(List<TraceGraphNodeDto> nodeDtoList, List<MaterialFlowRecordModel> flowRecordList, String pointer) {
         for (MaterialFlowRecordModel currentFlowRecord : flowRecordList) {
             // 判断已生成节点中是否存在对应快照ID
             long findExistingNodeStart = System.currentTimeMillis();
@@ -75,7 +75,7 @@ public class TraceGraphUtil {
                     actionNodeRecursionTime += System.currentTimeMillis() - resursionStart;
 
                     if (nextFlowRecords != null){
-                        downGenerateActionNodes(traceResult, nodeDtoList, nextFlowRecords, nodeDto.getKey());
+                        downGenerateActionNodes(nodeDtoList, nextFlowRecords, nodeDto.getKey());
                     }
                 }
             }
@@ -334,13 +334,13 @@ public class TraceGraphUtil {
         }
     }
 
-    public static List<TraceGraphNodeDto> drawTraceDownGraph(List<StartPointTraceInfo> startPointTraceInfoList, Map<String, MaterialFlowRecordModel> traceResult, Map<String, Boolean> startPointsToBeDel) {
+    public static List<TraceGraphNodeDto> drawTraceDownGraph(List<StartPointTraceInfo> startPointTraceInfoList, Map<String, List<MaterialFlowRecordModel>> traceResult, Set<String> startPointsToBeDel) {
 
         //过滤后的起点集合
         List<StartPointTraceInfo> filteredStartPoints = new ArrayList<>();
         //过滤起点
         for (StartPointTraceInfo startPointTraceInfo : startPointTraceInfoList) {
-            if (!startPointsToBeDel.containsKey(startPointTraceInfo.getSnapshotId())) {
+            if (!startPointsToBeDel.contains(startPointTraceInfo.getSnapshotId())) {
                 filteredStartPoints.add(startPointTraceInfo);
             }
         }

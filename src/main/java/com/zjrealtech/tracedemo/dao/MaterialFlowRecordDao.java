@@ -8,5 +8,7 @@ public interface MaterialFlowRecordDao {
 
     List<MaterialFlowRecordModel> getNextFlowRecordsByDestSnapshotId(List<String> snapshotIdList);
 
-    List<MaterialFlowRecordModel> getFlowRecordsByDestSnapshotId(String snapshotId);
+    List<MaterialFlowRecordModel> getFlowRecordsByDestSnapshotId(List<String> snapshotId);
+
+    public List<MaterialFlowRecordModel> getPreviousFlowRecordsBySrcSnapshotId(List<String> srcSnapshotIdList);
 }

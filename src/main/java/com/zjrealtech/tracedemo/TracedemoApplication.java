@@ -19,18 +19,8 @@ public class TracedemoApplication {
     public static void main(String[] args) {
         ConfigurableApplicationContext context = SpringApplication.run(TracedemoApplication.class, args);
         TraceDownDemo demo = context.getBean(TraceDownDemo.class);
-        demo.traceDownTest();
+        //demo.traceDownTest();
+        demo.traceUpTest();
         context.close();
-    }
-
-    @Bean
-    public Executor asyncExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(100);
-        executor.setMaxPoolSize(100);
-        executor.setQueueCapacity(5000);
-        executor.setThreadNamePrefix("tracedown-");
-        executor.initialize();
-        return executor;
     }
 }

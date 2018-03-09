@@ -49,14 +49,53 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-    b._id, b.src_snapshot_id, b.src_deduction_num, b.op_type, b.op_type_name, b.stock_type, b.stock_type_name, b.material_status, b.material_status_name, b.op_id, b.op_batch_id, b.op_time,
-    b.dest_snapshot_id, b.material_code, b.material_name, b.material_unit, b.batch_no, b.quantity, b.person_code, b.person_name, b.equipment_id, b.equipment_code,
-    b.equipment_name, b.mold_code, b.do_code, b.process_code, b.process_name, b.process_seq, b.shift_name, b.shift_start_time, b.shift_end_time,
-    b.parent_do_id, b.parent_process_code, b.parent_process_name, b.src_warehouse, b.src_warehouse_location, b.warehouse, b.warehouse_location,
-    b.src_barcode, b.barcode, b.quality_type, b.contact_no, b.contact_name, b.src_deduction_batch_id
+    b._id,
+    b.src_snapshot_id,
+    b.src_deduction_num,
+    b.op_type,
+    b.op_type_name,
+    b.stock_type,
+    b.stock_type_name,
+    b.material_status,
+    b.material_status_name,
+    b.op_id,
+    b.op_batch_id,
+    b.op_time,
+    b.dest_snapshot_id,
+    b.material_code,
+    b.material_name,
+    b.material_unit,
+    b.batch_no,
+    b.quantity,
+    b.person_code,
+    b.person_name,
+    b.equipment_id,
+    b.equipment_code,
+    b.equipment_name,
+    b.mold_code,
+    b.do_code,
+    b.process_code,
+    b.process_name,
+    b.process_seq,
+    b.shift_name,
+    b.shift_start_time,
+    b.shift_end_time,
+    b.parent_do_id,
+    b.parent_process_code,
+    b.parent_process_name,
+    b.src_warehouse,
+    b.src_warehouse_location,
+    b.warehouse,
+    b.warehouse_location,
+    b.src_barcode,
+    b.barcode,
+    b.quality_type,
+    b.contact_no,
+    b.contact_name,
+    b.src_deduction_batch_id
   </sql>
 
-    <select id="selectNextRecordsByDestSnapshotId" resultMap="BaseResultMap">
+    <select id="getNextFlowRecordsByDestSnapshotId" resultMap="BaseResultMap">
         select
         <include refid="Base_Column_List"/>
         from fact_material_flow_record a inner join fact_material_flow_record b on a.dest_snapshot_id = b.src_snapshot_id where exists (select 1 from dbo.Split(
@@ -65,10 +104,22 @@
             </if>
     </select>
 
-    <select id="selectRecordsByDestSnapshotId" resultMap="BaseResultMap">
+    <select id="getPreviousFlowRecordsBySrcSnapshotId" resultMap="BaseResultMap">
         select
         <include refid="Base_Column_List"/>
-        from fact_material_flow_record b where b.dest_snapshot_id = #{snapshotId}
+        from fact_material_flow_record a inner join fact_material_flow_record b on a.src_snapshot_id = b.dest_snapshot_id where exists (select 1 from dbo.Split(
+        <if test="srcSnapshotIdList != null">
+            ${srcSnapshotIdList}, ',') t where t.content = a.src_snapshot_id)
+        </if>
+    </select>
+
+    <select id="getFlowRecordsByDestSnapshotId" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from fact_material_flow_record b where exists (select 1 from dbo.Split(
+        <if test="snapshotIdList != null">
+            ${snapshotIdList}, ',') t where t.content = b.dest_snapshot_id)
+        </if>
     </select>
 
 </mapper>

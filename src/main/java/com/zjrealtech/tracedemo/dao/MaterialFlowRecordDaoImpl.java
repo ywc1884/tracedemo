@@ -20,12 +20,21 @@ public class MaterialFlowRecordDaoImpl implements MaterialFlowRecordDao {
     public List<MaterialFlowRecordModel> getNextFlowRecordsByDestSnapshotId(List<String> snapshotIdList) {
         StringJoiner stringJoiner = new StringJoiner(",", "'", "'");
         snapshotIdList.forEach(stringJoiner::add);
-        return materialFlowRecordMapper.selectNextRecordsByDestSnapshotId(stringJoiner.toString());
+        return materialFlowRecordMapper.getNextFlowRecordsByDestSnapshotId(stringJoiner.toString());
     }
 
     @Override
-    public List<MaterialFlowRecordModel> getFlowRecordsByDestSnapshotId(String snapshotId) {
-        return materialFlowRecordMapper.selectRecordsByDestSnapshotId(snapshotId);
+    public List<MaterialFlowRecordModel> getFlowRecordsByDestSnapshotId(List<String> snapshotIdList) {
+        StringJoiner stringJoiner = new StringJoiner(",", "'", "'");
+        snapshotIdList.forEach(stringJoiner::add);
+        return materialFlowRecordMapper.getFlowRecordsByDestSnapshotId(stringJoiner.toString());
+    }
+
+    @Override
+    public List<MaterialFlowRecordModel> getPreviousFlowRecordsBySrcSnapshotId(List<String> srcSnapshotIdList) {
+        StringJoiner stringJoiner = new StringJoiner(",", "'", "'");
+        srcSnapshotIdList.forEach(stringJoiner::add);
+        return materialFlowRecordMapper.getPreviousFlowRecordsBySrcSnapshotId(stringJoiner.toString());
     }
 }
 

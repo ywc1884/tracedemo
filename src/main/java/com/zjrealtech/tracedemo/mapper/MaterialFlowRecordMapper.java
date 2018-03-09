@@ -11,12 +11,19 @@ public interface MaterialFlowRecordMapper {
      * @param snapshotIdList 目标快照Id列表
      * @return 物料流转记录
      */
-    List<MaterialFlowRecordModel> selectNextRecordsByDestSnapshotId(@Param("snapshotIdList") String snapshotIdList);
+    List<MaterialFlowRecordModel> getNextFlowRecordsByDestSnapshotId(@Param("snapshotIdList") String snapshotIdList);
 
     /**
      * 根据目标快照Id列表查询对应的物料流转记录
-     * @param snapshotId 目标快照Id列表
+     * @param snapshotIdList 目标快照Id列表
      * @return 物料流转记录
      */
-    List<MaterialFlowRecordModel> selectRecordsByDestSnapshotId(@Param("snapshotId") String snapshotId);
+    List<MaterialFlowRecordModel> getFlowRecordsByDestSnapshotId(@Param("snapshotIdList") String snapshotIdList);
+
+    /**
+     * 根据目标快照Id列表查询下一批物料流转记录
+     * @param srcSnapshotIdList 源快照Id列表
+     * @return 物料流转记录
+     */
+    List<MaterialFlowRecordModel> getPreviousFlowRecordsBySrcSnapshotId(@Param("srcSnapshotIdList") String srcSnapshotIdList);
 }

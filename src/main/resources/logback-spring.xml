@@ -1,19 +1,9 @@
 <!--suppress XmlUnboundNsPrefix, XmlUnboundNsPrefix -->
 <configuration debug="false" scan="true" scanPeriod="30 seconds">
 
-    <timestamp key="bySecond" datePattern="yyyyMMddkkmmss"/>
-
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%date %highlight(%5level) [%thread] %cyan([%file:%line]) %msg%n</pattern>
-        </encoder>
-    </appender>
-
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>tracedemo-${bySecond}.log</file>
-        <append>true</append>
-        <encoder>
-            <Pattern>%d{HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</Pattern>
         </encoder>
     </appender>
 
@@ -23,7 +13,6 @@
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
     </root>
 
 </configuration>
