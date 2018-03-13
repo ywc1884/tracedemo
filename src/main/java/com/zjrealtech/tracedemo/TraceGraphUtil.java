@@ -69,7 +69,7 @@ public class TraceGraphUtil {
                     long resursionStart = System.currentTimeMillis();
 
                     //向后递归处理
-                    List<MaterialFlowRecordModel> nextFlowRecords = TraceDownDemo.traceDownRecordsMap.get(currentFlowRecord.getDestSnapshotId());
+                    List<MaterialFlowRecordModel> nextFlowRecords = null;//TraceDownDemo.traceDownRecordsMap.get(currentFlowRecord.getDestSnapshotId());
 
                     //sum the recursion time
                     actionNodeRecursionTime += System.currentTimeMillis() - resursionStart;

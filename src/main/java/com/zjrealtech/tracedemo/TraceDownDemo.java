@@ -11,6 +11,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @SuppressWarnings("SpringJavaAutowiredFieldsWarningInspection")
 @Component
@@ -22,13 +23,6 @@ public class TraceDownDemo {
 
     @Value("${split.count}")
     private int splitCount;
-
-    private Set<String> downDuplicateRecordFilterSet = new HashSet<>();
-    private Set<String> upDuplicateRecordFilterSet = new HashSet<>();
-    public static Map<String, List<MaterialFlowRecordModel>> traceDownRecordsMap = new HashMap<>();
-    public static Map<String, List<MaterialFlowRecordModel>> traceUpRecordsMap = new HashMap<>();
-    private Set<String> downStartPointsToFilter = new HashSet<>();
-    private Set<String> upStartPointsToFilter = new HashSet<>();
     public static String startPointsKey = "start_points";
 
     public void sqlTest() {
@@ -41,222 +35,173 @@ public class TraceDownDemo {
         try {
             long start = System.currentTimeMillis();
             String startPointDestSnapshotId = "D38542D9-050E-4B1A-9D7B-E8D14B599410";
-            //get start point flow records
-            List<MaterialFlowRecordModel> startPointsRecords = materialFlowRecordDao.getFlowRecordsByDestSnapshotId(Collections.singletonList(startPointDestSnapshotId));
-            //add the start point flow records into duplicate record filter set
-            startPointsRecords.forEach(record -> downDuplicateRecordFilterSet.add(getSnapshotKey(record.getSrcSnapshotId(), record.getDestSnapshotId())));
-            //recursively trace down to get all flow records
-            traceRecords(startPointsRecords);
-
-            log.info("the duplicate record filter set size: " + downDuplicateRecordFilterSet.size());
-
-            //filter out the found duplicate start point flow records and add to final trace down map
-            List<MaterialFlowRecordModel> filteredStartPointsRecords = new ArrayList<>();
-            for (MaterialFlowRecordModel startPointRecord : startPointsRecords){
-                if(!downStartPointsToFilter.contains(startPointRecord.getDestSnapshotId())){
-                    filteredStartPointsRecords.add(startPointRecord);
-                }
-            }
-            traceDownRecordsMap.put(startPointsKey, filteredStartPointsRecords);
+            StartPointTraceInfo startPointTraceInfo = new StartPointTraceInfo();
+            startPointTraceInfo.setSnapshotId(startPointDestSnapshotId);
+            Map<String, List<MaterialFlowRecordModel>> traceRecordsMap = getTraceRecords(Collections.singletonList(startPointTraceInfo), true);
 
             long millis = System.currentTimeMillis() - start;
             System.out.println(String.format("it totally took %s to trace down", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
                     TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)))));
 
-            int traceDownRecordsCount = traceDownRecordsMap.values().stream().map(List::size).reduce(0, (l1, l2) -> l1 + l2);
+            int traceDownRecordsCount = traceRecordsMap.values().stream().map(List::size).reduce(0, (l1, l2) -> l1 + l2);
             System.out.println("the total record count in trace down map is: " + traceDownRecordsCount);
 
-            //draw graph
-            long drawStart = System.currentTimeMillis();
-            StartPointTraceInfo startPointTraceInfo = new StartPointTraceInfo();
-            startPointTraceInfo.setSnapshotId(startPointDestSnapshotId);
-            TraceGraphUtil.drawTraceDownGraph(Collections.singletonList(startPointTraceInfo), traceDownRecordsMap, downStartPointsToFilter);
-            long drawTime = System.currentTimeMillis() - drawStart;
-            System.out.println(String.format("it totally took %s to draw graph", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(drawTime), TimeUnit.MILLISECONDS.toSeconds(drawTime) -
-                    TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(drawTime)))));
-
-            //list all time to draw action nodes
-            System.out.println(String.format("it totally took %s to find existing node", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findExistingNodeTime),
-                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.findExistingNodeTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findExistingNodeTime)))));
-            System.out.println(String.format("it totally took %s to find node to merge", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findNodeToMergeTime),
-                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.findNodeToMergeTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findNodeToMergeTime)))));
-            System.out.println(String.format("it totally took %s in action node recursion", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.actionNodeRecursionTime),
-                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.actionNodeRecursionTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.actionNodeRecursionTime)))));
+//            //draw graph
+//            long drawStart = System.currentTimeMillis();
+//            StartPointTraceInfo startPointTraceInfo = new StartPointTraceInfo();
+//            startPointTraceInfo.setSnapshotId(startPointDestSnapshotId);
+//            TraceGraphUtil.drawTraceDownGraph(Collections.singletonList(startPointTraceInfo), traceDownRecordsMap, downStartPointsToFilter);
+//            long drawTime = System.currentTimeMillis() - drawStart;
+//            System.out.println(String.format("it totally took %s to draw graph", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(drawTime), TimeUnit.MILLISECONDS.toSeconds(drawTime) -
+//                    TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(drawTime)))));
+//
+//            //list all time to draw action nodes
+//            System.out.println(String.format("it totally took %s to find existing node", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findExistingNodeTime),
+//                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.findExistingNodeTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findExistingNodeTime)))));
+//            System.out.println(String.format("it totally took %s to find node to merge", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findNodeToMergeTime),
+//                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.findNodeToMergeTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.findNodeToMergeTime)))));
+//            System.out.println(String.format("it totally took %s in action node recursion", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.actionNodeRecursionTime),
+//                    TimeUnit.MILLISECONDS.toSeconds(TraceGraphUtil.actionNodeRecursionTime) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(TraceGraphUtil.actionNodeRecursionTime)))));
         } catch (Exception e) {
             log.error("exception in traceDownTest", e);
         }
     }
 
-//    private Map<String, List<MaterialFlowRecordModel>> getTraceRecords(List<StartPointTraceInfo> startPointTraceInfoList){
-//        try {
-//            //get start point flow records
-//            List<MaterialFlowRecordModel> startPointsRecords = materialFlowRecordDao.getFlowRecordsByDestSnapshotId(startPointDestSnapshotId);
-//            //add the start point flow records into duplicate record filter set
-//            startPointsRecords.forEach(record -> downDuplicateRecordFilterSet.add(getSnapshotKey(record.getSrcSnapshotId(), record.getDestSnapshotId())));
-//        } catch (Exception e){
-//
-//        }
-//    }
+    private Map<String, List<MaterialFlowRecordModel>> getTraceRecords(List<StartPointTraceInfo> startPointTraceInfoList, boolean traceDown) {
+        //set used to filter out duplicate flow records based on src_snapshot_id + dest_snapshot_id
+        Set<String> duplicateRecordsFilterSet = new HashSet<>();
+        //final records map to return containing all flow records
+        Map<String, List<MaterialFlowRecordModel>> traceRecordsMap = new HashMap<>();
+        //start points filter list
+        Set<String> startPointsFilterSet = new HashSet<>();
 
-    private void traceRecords(List<MaterialFlowRecordModel> currentFlowRecords) {
+        try {
+            //get start point flow records
+            List<String> startPointsSnapshotIdList = startPointTraceInfoList.stream().map(StartPointTraceInfo::getSnapshotId).collect(Collectors.toList());
+            List<MaterialFlowRecordModel> startPointsRecords = materialFlowRecordDao.getFlowRecordsByDestSnapshotId(startPointsSnapshotIdList);
+            //add the start point flow record keys into duplicate record filter set
+            startPointsRecords.forEach(record -> duplicateRecordsFilterSet.add(getSnapshotKey(record.getSrcSnapshotId(), record.getDestSnapshotId())));
+
+            //call traceRecords to recursively find all flow records
+            traceRecords(startPointsRecords, traceRecordsMap, duplicateRecordsFilterSet, startPointsFilterSet, traceDown);
+
+            //filter out the found duplicate start point flow records and add to final trace down map
+            List<MaterialFlowRecordModel> filteredStartPointsRecords = new ArrayList<>();
+            for (MaterialFlowRecordModel startPointRecord : startPointsRecords) {
+                if (!startPointsFilterSet.contains(startPointRecord.getDestSnapshotId())) {
+                    filteredStartPointsRecords.add(startPointRecord);
+                }
+            }
+            if (traceDown) {
+                traceRecordsMap.put(startPointsKey, filteredStartPointsRecords);
+            } else {
+                List<MaterialFlowRecordModel> tmpStartPointsRecordList;
+                for (MaterialFlowRecordModel record : filteredStartPointsRecords) {
+                    String destSnapshotId = record.getDestSnapshotId();
+                    if (!traceRecordsMap.containsKey(destSnapshotId)) {
+                        tmpStartPointsRecordList = new ArrayList<>(Collections.singletonList(record));
+                    } else {
+                        tmpStartPointsRecordList = traceRecordsMap.get(destSnapshotId);
+                        tmpStartPointsRecordList.add(record);
+                    }
+                    traceRecordsMap.put(destSnapshotId, tmpStartPointsRecordList);
+                }
+            }
+        } catch (Exception e) {
+            log.error("exception in getTraceRecords", e);
+        }
+
+        return traceRecordsMap;
+    }
+
+    private void traceRecords(List<MaterialFlowRecordModel> currentFlowRecords, Map<String, List<MaterialFlowRecordModel>> traceRecordsMap,
+                              Set<String> duplicateRecordsFilterSet, Set<String> startPointsFilterSet, boolean traceDown) {
         if (currentFlowRecords.size() > splitCount) {
             for (int i = 0, j = splitCount; i < currentFlowRecords.size(); i += splitCount, j += splitCount) {
                 j = j > currentFlowRecords.size() ? currentFlowRecords.size() : j;
                 List<MaterialFlowRecordModel> subList = new ArrayList<>(currentFlowRecords.subList(i, j));
                 if (!CollectionUtils.isEmpty(subList)) {
-                    traceRecords(subList);
+                    traceRecords(subList, traceRecordsMap, duplicateRecordsFilterSet, startPointsFilterSet, traceDown);
                 }
             }
         } else {
+            List<MaterialFlowRecordModel> nextFlowRecords;
             List<MaterialFlowRecordModel> filteredNextFlowRecords = new ArrayList<>();
-            List<MaterialFlowRecordModel> nextFlowRecords = new ArrayList<>();
 
             try {
                 Set<String> snapshotIds = new HashSet<>();
                 for (MaterialFlowRecordModel record : currentFlowRecords) {
-                    snapshotIds.add(record.getDestSnapshotId());
+                    if (traceDown) {
+                        snapshotIds.add(record.getDestSnapshotId());
+                    } else {
+                        snapshotIds.add(record.getSrcSnapshotId());
+                    }
                 }
-                nextFlowRecords = materialFlowRecordDao.getNextFlowRecordsByDestSnapshotId(new ArrayList<>(snapshotIds));
+
+                if (traceDown) {
+                    nextFlowRecords = materialFlowRecordDao.getNextFlowRecordsByDestSnapshotId(new ArrayList<>(snapshotIds));
+                } else {
+                    nextFlowRecords = materialFlowRecordDao.getPreviousFlowRecordsBySrcSnapshotId(new ArrayList<>(snapshotIds));
+                }
 
                 if (!CollectionUtils.isEmpty(nextFlowRecords)) {
                     nextFlowRecords.forEach(nextRecord -> {
                         String destSnapshotId = nextRecord.getDestSnapshotId();
                         String srcSnapshotId = nextRecord.getSrcSnapshotId();
                         String snapshotKey = getSnapshotKey(srcSnapshotId, destSnapshotId);
-                        if (!downDuplicateRecordFilterSet.contains(snapshotKey)) {
+                        if (!duplicateRecordsFilterSet.contains(snapshotKey)) {
+                            duplicateRecordsFilterSet.add(snapshotKey);
                             filteredNextFlowRecords.add(nextRecord);
-                            downDuplicateRecordFilterSet.add(snapshotKey);
                         } else {
                             //keep a record of duplicate records with duplicate dest snapshot id, used to filter start points
-                            downStartPointsToFilter.add(destSnapshotId);
+                            startPointsFilterSet.add(destSnapshotId);
                         }
                     });
 
+                    //add all the next level records into the final map
+                    String snapshotId = traceDown ? nextFlowRecords.get(0).getSrcSnapshotId() : nextFlowRecords.get(0).getDestSnapshotId();
+                    List<MaterialFlowRecordModel> nextRecords;
+                    if (!traceRecordsMap.containsKey(snapshotId)) {
+                        nextRecords = new ArrayList<>(nextFlowRecords);
+                    } else {
+                        nextRecords = traceRecordsMap.get(snapshotId);
+                        nextRecords.addAll(nextFlowRecords);
+                    }
+                    traceRecordsMap.put(snapshotId, nextRecords);
+                }
+
+                if (!CollectionUtils.isEmpty(filteredNextFlowRecords)) {
+                    traceRecords(filteredNextFlowRecords, traceRecordsMap, duplicateRecordsFilterSet, startPointsFilterSet, traceDown);
                 }
             } catch (Exception e) {
                 log.error("exception in traceRecords", e);
             }
-
-            if (!CollectionUtils.isEmpty(nextFlowRecords)) {
-                String srcSnapshotId = nextFlowRecords.get(0).getSrcSnapshotId();
-                List<MaterialFlowRecordModel> nextRecords;
-                if (!traceDownRecordsMap.containsKey(srcSnapshotId)){
-                    nextRecords = new ArrayList<>(nextFlowRecords);
-                } else {
-                    nextRecords = traceDownRecordsMap.get(srcSnapshotId);
-                    nextRecords.addAll(nextFlowRecords);
-                }
-                traceDownRecordsMap.put(srcSnapshotId, nextRecords);
-
-                traceRecords(filteredNextFlowRecords);
-            }
         }
     }
 
-    private String getSnapshotKey(String srcId, String destId){
+    private String getSnapshotKey(String srcId, String destId) {
         return srcId + "@" + destId;
     }
 
-    public void traceUpTest(){
+    public void traceUpTest() {
         try {
             long start = System.currentTimeMillis();
             String startPointDestSnapshotId = "FB316F10-6694-4CB4-A04A-C9B3010BE9E1";
-            //get start point flow records
-            List<MaterialFlowRecordModel> startPointsRecords = materialFlowRecordDao.getFlowRecordsByDestSnapshotId(Collections.singletonList(startPointDestSnapshotId));
-            //add the start point flow records into duplicate record filter set
-            startPointsRecords.forEach(record -> upDuplicateRecordFilterSet.add(getSnapshotKey(record.getSrcSnapshotId(), record.getDestSnapshotId())));
+            StartPointTraceInfo startPointTraceInfo = new StartPointTraceInfo();
+            startPointTraceInfo.setSnapshotId(startPointDestSnapshotId);
             //recursively trace up to get all flow records
-            traceUpRecords(startPointsRecords);
-
-            log.info("the duplicate record filter set size: " + upDuplicateRecordFilterSet.size());
-
-            //filter out the found duplicate start point flow records and add to final trace down map
-            List<MaterialFlowRecordModel> filteredStartPointsRecords = new ArrayList<>();
-            for (MaterialFlowRecordModel startPointRecord : startPointsRecords){
-                if(!upStartPointsToFilter.contains(startPointRecord.getDestSnapshotId())){
-                    filteredStartPointsRecords.add(startPointRecord);
-                }
-            }
-            List<MaterialFlowRecordModel> tmpList;
-            for(MaterialFlowRecordModel record : filteredStartPointsRecords){
-                String destSnapshotId = record.getDestSnapshotId();
-                if (!traceUpRecordsMap.containsKey(destSnapshotId)){
-                    tmpList = new ArrayList<>(Collections.singletonList(record));
-                } else {
-                    tmpList = traceUpRecordsMap.get(destSnapshotId);
-                    tmpList.add(record);
-                }
-                traceUpRecordsMap.put(destSnapshotId, tmpList);
-            }
+            Map<String, List<MaterialFlowRecordModel>> traceRecordsMap = getTraceRecords(Collections.singletonList(startPointTraceInfo), false);
 
             long millis = System.currentTimeMillis() - start;
             System.out.println(String.format("it totally took %s to trace up", String.format("%d mins, %d secs", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
                     TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)))));
 
-            int traceDownRecordsCount = traceUpRecordsMap.values().stream().map(List::size).reduce(0, (l1, l2) -> l1 + l2);
+            int traceDownRecordsCount = traceRecordsMap.values().stream().map(List::size).reduce(0, (l1, l2) -> l1 + l2);
             System.out.println("the total record count in trace up map is: " + traceDownRecordsCount);
-        } catch (Exception e){
-
+        } catch (Exception e) {
+            log.error("exception in traceUpTest", e);
         }
     }
-
-    private void traceUpRecords(List<MaterialFlowRecordModel> currentFlowRecords) {
-        if (currentFlowRecords.size() > splitCount) {
-            for (int i = 0, j = splitCount; i < currentFlowRecords.size(); i += splitCount, j += splitCount) {
-                j = j > currentFlowRecords.size() ? currentFlowRecords.size() : j;
-                List<MaterialFlowRecordModel> subList = new ArrayList<>(currentFlowRecords.subList(i, j));
-                if (!CollectionUtils.isEmpty(subList)) {
-                    traceUpRecords(subList);
-                }
-            }
-        } else {
-            List<MaterialFlowRecordModel> filteredPreviousFlowRecords = new ArrayList<>();
-            List<MaterialFlowRecordModel> previousFlowRecords = new ArrayList<>();
-
-            try {
-                Set<String> snapshotIds = new HashSet<>();
-                for (MaterialFlowRecordModel record : currentFlowRecords) {
-                    snapshotIds.add(record.getSrcSnapshotId());
-                }
-                previousFlowRecords = materialFlowRecordDao.getPreviousFlowRecordsBySrcSnapshotId(new ArrayList<>(snapshotIds));
-
-                if (!CollectionUtils.isEmpty(previousFlowRecords)) {
-                    previousFlowRecords.forEach(previousRecord -> {
-                        String destSnapshotId = previousRecord.getDestSnapshotId();
-                        String srcSnapshotId = previousRecord.getSrcSnapshotId();
-                        String snapshotKey = getSnapshotKey(srcSnapshotId, destSnapshotId);
-                        if (!upDuplicateRecordFilterSet.contains(snapshotKey)) {
-                            filteredPreviousFlowRecords.add(previousRecord);
-                            upDuplicateRecordFilterSet.add(snapshotKey);
-                        } else {
-                            //keep a record of duplicate records with duplicate dest snapshot id, used to filter start points
-                            upStartPointsToFilter.add(destSnapshotId);
-                        }
-                    });
-
-                }
-            } catch (Exception e) {
-                log.error("exception in traceRecords", e);
-            }
-
-            if (!CollectionUtils.isEmpty(previousFlowRecords)) {
-                String destSnapshotId = previousFlowRecords.get(0).getDestSnapshotId();
-                List<MaterialFlowRecordModel> previousRecords;
-                if (!traceUpRecordsMap.containsKey(destSnapshotId)){
-                    previousRecords = new ArrayList<>(previousFlowRecords);
-                } else {
-                    previousRecords = traceUpRecordsMap.get(destSnapshotId);
-                    previousRecords.addAll(previousFlowRecords);
-                }
-                traceUpRecordsMap.put(destSnapshotId, previousRecords);
-
-                traceUpRecords(filteredPreviousFlowRecords);
-            }
-        }
-    }
-
-
-
 //    @Async
 //    public CompletableFuture<List<MaterialFlowRecordModel>> getNextFlowRecordsAsync(List<String> snapshotIdList) {
 //        List<MaterialFlowRecordModel> nextFlowRecords = new ArrayList<>();
